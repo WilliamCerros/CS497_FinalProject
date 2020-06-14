@@ -17,13 +17,10 @@ from numpy import asarray
 
 # image download runtime ~ 3 hours
 
-# creating our webcrawler
-crawler = webdriver.Chrome("C:/Users/willi/Desktop/CS497_Final/chromedriver.exe")
-
-
 # the following lists will hold a rocks, name, location (lat & lat coordinates) and the its image number
 # there are a total of 8,3999 rocks that will be downloaded
 image_name = []
+image_id = []
 image_location = []
 image_link = []
 image_number = 1
@@ -215,27 +212,32 @@ def download_image(url, file_path, file_name):
 
 # function will populate your street_view and satellite_view folders
 # with the downloaded images from the website
-def fill_folders(rock_link, number_of_rocks, rock_location):
+def fill_folders(rock_link, number_of_rocks, rock_location, image_id):
     # Each rock image will be named after their respective image_number, from 1 to 8,399
     global image_number
     i = 0
 
     # while loop will download every rock image
     while number_of_rocks > i:
-        image_number = str(image_number)
         current_directory = os.getcwd()
-        file_path = current_directory + '\street_view/'
+        file_path = current_directory + '\street_view_rocks/'
         url = rock_link[i]
-        file_name = image_number
+        file_name = image_id[i]
         download_image(url, file_path, file_name)
 
-        file_path = current_directory + '\satellite_view/'
+        file = open(r'./street_view_rocks/coordinates.txt', 'a')
+        rock_id_and_loc = 'rock id: ' + image_id[i] + ' coordinates: ' + rock_location[i] + '\n'
+        file.write(rock_id_and_loc)
+        file.close()
+        # uncomment code to begin downloading satellite view for rocks
 
-        # call helper function to get the url for the satellite image
-        # of the rock we downloaded above
-        satellite_url = get_satellite_url(rock_location[i])
-        download_image(satellite_url, file_path, file_name)
-
+        # file_path = current_directory + '\satellite_view/'
+        #
+        # # call helper function to get the url for the satellite image
+        # # of the rock we downloaded above
+        # satellite_url = get_satellite_url(rock_location[i])
+        # download_image(satellite_url, file_path, file_name)
+        #
         image_number = int(image_number)
         image_number += 1
         i += 1
@@ -266,6 +268,10 @@ def download_images(spider):
     # while loop will parse through the web page source and extract the name, coordinates, and image link associated
     # with each rock
     while number_of_images > i:
+        index = page_source.find('"id":')
+        page_source = page_source[index + 5:]
+        index = page_source.find(',')
+        rock_id = page_source[:index]
         index = page_source.find('"name":"')
         page_source = page_source[index + 8:]
         index = page_source.find(',')
@@ -285,18 +291,21 @@ def download_images(spider):
         index = page_source.find('"')
         image_url = page_source[:index]
 
+        image_id.append(rock_id)
         image_name.append(name)
         image_location.append(location)
         image_link.append(image_url)
         i += 1
 
     # call function to populate our street_view and satellite_view image
-    # fill_folders(image_link, len(image_name), image_location)
+    fill_folders(image_link, len(image_name), image_location, image_id)
 
     # empty the list after each download
     image_name[:] = []
     image_link[:] = []
     image_location[:] = []
+    image_id[:] = []
+
 
 
     # if num_of_clicks is greater than 0 it means we have more than 50 images to download
@@ -327,6 +336,10 @@ def download_images(spider):
             j = 0
 
             while j < num_of_images:
+                index = json_info.find('"id":')
+                json_info = json_info[index + 5:]
+                index = json_info.find(',')
+                rock_id = json_info[:index]
                 index = json_info.find('"name":"')
                 json_info = json_info[index + 8:]
                 index = json_info.find(',')
@@ -346,6 +359,7 @@ def download_images(spider):
                 index = json_info.find('"')
                 image_url = json_info[:index]
 
+                image_id.append(rock_id)
                 image_name.append(name)
                 image_location.append(location)
                 image_link.append(image_url)
@@ -354,12 +368,13 @@ def download_images(spider):
 
 
             # populate our folders with the remaining images on the page
-            # fill_folders(image_link, len(image_name), image_location)
+            fill_folders(image_link, len(image_name), image_location, image_id)
 
             # recycle the list
             image_name[:] = []
             image_link[:] = []
             image_location[:] = []
+            image_id[:] = []
 
             offset += 50
             i += 1
@@ -460,13 +475,15 @@ def create_street_dataset(num_of_images):
             i += 1
         else:
             path = os.getcwd()
-            path = path + '/street_view/'
+            path = path + '/street/'
             file_name = str(i) + '.jpeg'
             path = path + file_name
 
+            print(path)
+
 
             image = Image.open(path)
-            image = image.resize((104, 104))
+            image = image.resize((600, 600))
             image = asarray(image)
 
             street_data.append(image)
@@ -490,13 +507,13 @@ def create_satellite_dataset(num_of_images):
             i += 1
         else:
             path = os.getcwd()
-            path = path + '/satellite_view/'
+            path = path + '/sat/'
             file_name = str(i) + '.jpeg'
             path = path + file_name
 
             print(path)
             image = Image.open(path).convert("RGB")
-            image = image.resize((104, 104))
+            image = image.resize((600, 600))
             image = asarray(image)
 
 
@@ -507,21 +524,28 @@ def create_satellite_dataset(num_of_images):
 
 
 
+
+
+
+
 # begin the image download process
 # total runtime ~ 3 hours
 # 10 total gb of data
 # 8,399 images of rocks and 8,399 satellite images
 # 16,798 images
+
+# creating our webcrawler
+crawler = webdriver.Chrome("C:/Users/willi/Desktop/CSUSM/Spring '20/CS 497/Final/chromedriver.exe")
 page_navigator(crawler)
 
 # converting our images to a numpy dataset
 # shape of each dataset is (8,379, 104, 104, 3)
 # 8,379 images, 104x104 pixels, RGB so 3 color channels
-create_street_dataset(8399)
-create_satellite_dataset(8399)
-
-street_data = asarray(street_data)
-satellite_data = asarray(satellite_data)
-
-np.save('street_dataset_104p.npy', street_data)
-np.save('satellite_dataset_104p.npy', satellite_data)
+# create_street_dataset(image_number)
+# create_satellite_dataset(8399)
+#
+# street_data = asarray(street_data)
+# satellite_data = asarray(satellite_data)
+#
+# np.save('street_dataset_600p.npy', street_data)
+# np.save('satellite_dataset_600p.npy', satellite_data)
